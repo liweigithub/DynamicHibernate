@@ -1,0 +1,28 @@
+<!-- HOP Hibernate Dynamic Statement Mapping DTD.
+
+	<!DOCTYPE dynamic-statement SYSTEM ">
+
+	这个文件时用来定义动态参数语句，类似itabis
+
+	-->
+
+	<!--
+		The document root.
+	 -->
+
+	<!ELEMENT dynamic-statement (
+		(hql-query|sql-query)*
+	)>
+								<!-- default: none -->
+
+	<!-- The query element declares a named Hibernate query string -->
+
+	<!ELEMENT hql-query (#PCDATA)>
+		<!ATTLIST hql-query name CDATA #REQUIRED>
+
+	<!-- The sql-query element declares a named SQL query string -->
+
+	<!ELEMENT sql-query (#PCDATA)>
+		<!ATTLIST sql-query name CDATA #REQUIRED>
+
+
