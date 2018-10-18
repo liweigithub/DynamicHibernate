@@ -46,6 +46,7 @@ public class EmployeeServiceImpl  extends  BaseServiceImpl<Employee> implements 
         //需要再添加一个组合条件：(sex=1 AND name LIKE '1%')  类似我们想要的结果是这样的：  status = 1 and (sex=1 AND name LIKE '1%')  此时这个组合条件是需要以or 还是 and 来进行封装就取决于 第二个and（group_and_and）
         //所以整个过程下来 我们得到的结果是：where 1=1 and status = 1 and (sex=1 AND name LIKE '1%')
         conditions.add(new Condition("status","1", Op.EQ,OpType.AND));
+        //注意column 的参数是两个
         conditions.add(new Condition("sex,name","1", Op.LIKE_RIGHT, OpType.GROUP_AND_AND));
         //其他的类似
 
@@ -86,6 +87,10 @@ public class EmployeeServiceImpl  extends  BaseServiceImpl<Employee> implements 
         list = this.findList(conditions,  orderBys);
 
         return list;
+
+        //condtion 一些使用技巧
+        //有关联对象采用导航方式添加条件即可,
+        // 例如：conditions.add(new Condition("duty.id","1123", Op.EQ, OpType.AND));
     }
 
     public void listPage(String name,int pageIndex,int pageSize){
@@ -97,7 +102,32 @@ public class EmployeeServiceImpl  extends  BaseServiceImpl<Employee> implements 
 
         //orderby 如果不需要排序 直接传递null值即可，
         //此时如果不想分页 但是想用findPage 将 pageSize 最大值即可:Integer.MAX_VALUE 或者直接用上面的    findList 方法
-        this.findPage(conditions, null, pageIndex, pageSize);
+        PageBean<Employee> pageBean = this.findPage(conditions, null, pageIndex, pageSize);
+        System.out.println("数据信息："+pageBean.getDataCount());
+        System.out.println("总页数："+pageBean.getTotalPage());
+        System.out.println("总记录数："+pageBean.getDataCount());
+        System.out.println("是否有下一页："+pageBean.isNextPage());
+        System.out.println("是否有上一页："+pageBean.isPrePage());
+        System.out.println("类似百度的分页：前4后5 滚动页码：");
+
+        //打印页码值
+        for(int i = pageBean.getStart();i<=pageBean.getEnd();i++){
+            int currentPage = i;
+            System.out.print("\t"+i);
+        }
+
+        //通常情况下 写api接口 我们不想把 pageBean data的所有字段返回给移动端 我们就需要這样 遍历数据 取出想要的数据 封装到map
+        List<Map<String,Object>> dataMaps = new ArrayList<Map<String, Object>>();
+        for(Employee employee1:pageBean.getData()){
+            Map<String,Object> data = new HashMap<String, Object>();
+            data.put("name",employee1.getName());
+            data.put("birthday",employee1.getBirthday());
+            dataMaps.add(data);
+        }
+        Map<String, Object> infoData = PageBean.renderPageInfoData(pageBean, dataMaps, pageIndex);
+        //给客户端就是json 数据 如果是spring mvc  直接返回 map就可以了
+        System.out.print(JSON.toJSON(infoData));
+
     }
 
     /**
