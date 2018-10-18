@@ -1,9 +1,10 @@
 package com.hyaroma.service.impl;
 
-import com.hyaroma.dao.utils.ReflectionUtils;
+
 import com.hyaroma.dao.base.Condition;
 import com.hyaroma.dao.base.IBaseDao;
 import com.hyaroma.dao.base.PageBean;
+import com.hyaroma.dao.utils.ReflectionUtils;
 import com.hyaroma.enums.OrderType;
 import com.hyaroma.service.IBaseService;
 
@@ -19,30 +20,41 @@ import java.util.Map;
  */
 public class BaseServiceImpl<T> implements IBaseService<T> {
 
-    @Resource(name="baseDaoImpl")
+    @Resource(name = "baseDaoImpl")
     private IBaseDao baseDao;
 
 
     @Override
-    public T findById(long id) {
+    public T findById(String id) {
+        Class<T> clazz = ReflectionUtils.getSuperClassGenricType(getClass());
+        T persisit = (T) baseDao.findById(clazz, id);
+        return persisit;
+    }
+
+    @Override
+    public T findById(int id) {
         Class<T> clazz = ReflectionUtils.getSuperClassGenricType(getClass());
         T persisit = (T) baseDao.findById(clazz, id);
         return persisit;
     }
 
 
+    @Override
+    public void delete(T t) {
+        baseDao.delete(t);
+    }
+
     /**
      * 根据原生sql语句进行查询,返回对象集合
      * String sql 原生sql语句
-     *  Class clazz 为类 String[] fields
+     * Class clazz 为类 String[] fields
      * 必需为对象字段属性
      * 例子: Sql : select username as name ,userage as age from user;
      * User : private String name , private int age
      * clazz = User.class
      * fields ={ "name","age" }; //注意 sql和fields必需一致,并且fields为User的字段属性
      * 返回格式 list = { user1,user2,user3... }
-     *
-     * */
+     */
     public List findBySql(String sql, Class clazz, String[] fields) {
         return this.baseDao.queryBySQL(sql, clazz, fields);
     }
@@ -58,26 +70,24 @@ public class BaseServiceImpl<T> implements IBaseService<T> {
      * 返回
      * map1 = { name="张三",age=30}; map2 = { name="李四",age=18};
      * list = { map1 ,map2}
-     *
-     * */
-    public List<Map<String,Object>> findBySql(String sql, String[] fields) {
+     */
+    public List<Map<String, Object>> findBySql(String sql, String[] fields) {
         return this.baseDao.queryBySQL(sql, fields);
     }
 
 
     /**
      * 根据原生sql语句查询 entity必须为hibernate映射的实体
-     * */
+     */
     @Override
     public List findBySql(String sql, Class entity) {
         return this.baseDao.queryBySQL(sql, entity);
     }
 
 
-
     /**
      * 根据sql查询
-     * */
+     */
     public List findBySql(String sql, Object... values) {
         return this.baseDao.queryBySQL(sql, values);
 
@@ -85,7 +95,7 @@ public class BaseServiceImpl<T> implements IBaseService<T> {
 
     /**
      * 根据hql查询
-     * */
+     */
     public List findByHql(String hql) {
         return this.baseDao.queryByHQL(hql);
     }
@@ -95,7 +105,6 @@ public class BaseServiceImpl<T> implements IBaseService<T> {
      *
      * @param values 数量可变的参数,按顺序绑定.
      */
-    @Override
     public List findByHQL(String hql, Object... values) {
         return this.baseDao.queryByHQL(hql, values);
     }
@@ -107,40 +116,29 @@ public class BaseServiceImpl<T> implements IBaseService<T> {
     }
 
     @Override
-    public void delete(T t){
-        baseDao.delete(t);
-    }
-
-    @Override
     public PageBean<T> findPage(ArrayList<Condition> conditions, LinkedHashMap<String, OrderType> orderBys, int pageIndex, int pageSize) {
         Class<T> clazz = ReflectionUtils.getSuperClassGenricType(getClass());
-        PageBean<T> page = baseDao.findPage(clazz,conditions,orderBys,pageIndex, pageSize);
+        PageBean<T> page = baseDao.findPage(clazz, conditions, orderBys, pageIndex, pageSize);
         return page;
     }
 
     @Override
     public List<T> findList(ArrayList<Condition> conditions, LinkedHashMap<String, OrderType> orderBys) {
         Class<T> clazz = ReflectionUtils.getSuperClassGenricType(getClass());
-        List<T> list = baseDao.findList(clazz,conditions,orderBys);
+        List<T> list = baseDao.findList(clazz, conditions, orderBys);
         return list;
     }
 
     @Override
-    public PageBean<Object> findByNamedQuery(String queryName,int pageIndex,int pageSize,
+    public PageBean<Object> findByNamedQuery(String queryName, int pageIndex, int pageSize,
                                              Class clazz, String[] fields, Map<String, ?> parameters) {
-        return this.baseDao.queryByDynamicName(queryName, pageIndex,pageSize,clazz, fields, parameters);
+        return this.baseDao.queryByDynamicName(queryName, pageIndex, pageSize, clazz, fields, parameters);
     }
 
 
-
     @Override
-    public PageBean<Map<String, Object>> findByNamedQuery(String queryName,int pageIndex,int pageSize,
+    public PageBean<Map<String, Object>> findByNamedQuery(String queryName, int pageIndex, int pageSize,
                                                           String[] fields, Map<String, ?> parameters) {
-        return this.baseDao.queryByDynamicName(queryName,pageIndex,pageSize, fields, parameters);
-    }
-
-    @Override
-    public int executeByDynamicName(String queryName, Map<String, ?> parameters) {
-        return baseDao.executeByDynamicName(queryName,parameters);
+        return this.baseDao.queryByDynamicName(queryName, pageIndex, pageSize, fields, parameters);
     }
 }

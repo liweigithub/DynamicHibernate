@@ -4,55 +4,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * @author  wstv
- * @param <T>
- */
 public class PageBean<T> {
-    /**
-     * 索引
-     */
-    private int  pageIndex;
-    /**
-     * 总页数
-     */
-    private int totalPage;
-
-    /**
-     * 每页显示条数
-     */
-    private int pageSize;
-
-    /**
-     * 总记录数
-     */
-    private int dataCount;
-
-    /**
-     * 数据信息
-     */
+    private int  pageIndex;//索引
+    private int totalPage;//总页数
+    private int pageSize;//每页显示条数
+    private int dataCount;// 总记录数
     private List<T> data;
-
-    /**
-     * 动态显示条起始位置
-     */
+    // 动态显示条
     private int start = 1;
-
-    /**
-     * 动态显示条结束为止
-     */
     private int end = 10;
 
-    /**
-     * 是否有下一页
-     */
-    private boolean nextPage;
-
-    /**
-     * 是否有上一页
-     */
-    private boolean prePage;
-
+    private boolean nextPage;//是否有下一页
+    private boolean prePage;//是否有上一页
 
     public PageBean(int pageIndex, int pageSize, int dataCount) {
         this.pageIndex = pageIndex;
@@ -72,6 +35,9 @@ public class PageBean<T> {
         }else if(currentPage >= this.totalPage){
             this.prePage = true;
             this.nextPage = false;
+        }else if(currentPage < this.totalPage){
+            this.prePage = true;
+            this.nextPage = true;
         }
         // 3 动态显示条
         // 3.1 初始化数据 -- 显示10个分页
@@ -198,5 +164,24 @@ public class PageBean<T> {
         data.put("end",end);
         data.put("list",dataModel);
         return data;
+    }
+    public static Map<String,Object> renderSimpleData(Object data){
+        Map<String,Object> map = new HashMap<String,Object>();
+        map.put("list",data);
+        return map;
+    }
+    @Override
+    public String toString() {
+        return "PageBean{" +
+                "pageIndex=" + pageIndex +
+                ", totalPage=" + totalPage +
+                ", pageSize=" + pageSize +
+                ", dataCount=" + dataCount +
+                ", data=" + data.toString() +
+                ", start=" + start +
+                ", end=" + end +
+                ", nextPage=" + nextPage +
+                ", prePage=" + prePage +
+                '}';
     }
 }

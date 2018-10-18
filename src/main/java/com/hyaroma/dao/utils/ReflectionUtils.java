@@ -3,12 +3,6 @@ package com.hyaroma.dao.utils;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-/**
- * @author wstv
- * @ClassName: ReflectionUtils
- * @Description: 反射类工具
- */
-
 public class ReflectionUtils {
 	private ReflectionUtils() {
 	}

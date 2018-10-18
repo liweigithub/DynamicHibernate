@@ -1,8 +1,10 @@
 package com.hyaroma.dao.base;
 
-import com.hyaroma.exception.FDaoException;
+
+import com.hyaroma.dao.utils.ValidateUtil;
 import com.hyaroma.enums.Op;
 import com.hyaroma.enums.OpType;
+import com.hyaroma.exception.WDaoException;
 
 /**
  * 条件封装
@@ -27,16 +29,28 @@ public class Condition {
     public String buildHql(){
 
         //是否有多列值并行筛选的情况 比如：（id,code） where 1=1 and (id=1 or code=1)
-        // 只有 optype 有group的情况会存在多列，如过非group 条件存在多列 则抛异常
+        // 只有 optype 有group的情况会存在多列，如果非group 条件存在多列 则抛异常
         String[] columnsArray = getColumn().split(",");
         OpType type = getType();
         if ((type==OpType.AND || type == OpType.OR)&&columnsArray.length>1){
-            throw  new FDaoException("Not Group Condition ，Not Allow Many column ! Please Check Your Condition column ("+getColumn()+") Condition is "+getType());
+            throw  new WDaoException("Not Group Condition ，Not Allow Many column ! Please Check Your Condition column ("+getColumn()+") Condition is "+getType());
         }
         Op op = getOp();
         Object value = getValue();
         //单独处理like 逻辑条件
         switch (op){
+            case EQ:
+                break;
+            case NEQ:
+                break;
+            case GT:
+                break;
+            case GTE:
+                break;
+            case LT:
+                break;
+            case LTE:
+                break;
             case  LIKE:
                 value = "%"+value+"%";
                 break;
@@ -46,7 +60,20 @@ public class Condition {
             case LIKE_RIGHT:
                     value = value+"%";
                 break;
-
+            case IN:
+                    if (ValidateUtil.isNull(String.valueOf(value))){
+                        value = "('"+value+"')";
+                    }else{
+                        value = buildConditionByInValue(value);
+                    }
+                break;
+            case NOT_IN:
+                if (ValidateUtil.isNull(String.valueOf(value))){
+                    value = "('"+value+"')";
+                }else{
+                    value = buildConditionByInValue(value);
+                }
+                break;
             default:
                     value =value;
                 break;
@@ -60,11 +87,19 @@ public class Condition {
         switch (type){
             case AND:
                 builder.append(" and ");
-                builder.append(getColumn()+" "+op.getCode()+" '"+value+"'");
+                if (op == Op.IN || op == Op.NOT_IN){
+                    builder.append(getColumn()+" "+op.getCode()+value);
+                }else{
+                    builder.append(getColumn()+" "+op.getCode()+" '"+value+"'");
+                }
                 break;
             case OR:
                 builder.append(" or ");
-                builder.append(getColumn()+" "+op.getCode()+" '"+value+"' ");
+                if (op == Op.IN || op == Op.NOT_IN){
+                    builder.append(getColumn()+" "+op.getCode()+value);
+                }else{
+                    builder.append(getColumn()+" "+op.getCode()+" '"+value+"' ");
+                }
                 break;
             case GROUP_AND_AND:
                 //where 1=1 and (id=1 and code=1 )
@@ -109,6 +144,31 @@ public class Condition {
         return builder.toString();
     }
 
+    /**
+     * 由于 in 条件的比较特殊 有些情况下 会涉及到 比如： '111','222','','' 涉及到 值为 null的时候
+     * 一般情况数据库查询的值为：111,222,333,444,555,666 类似这样
+     * 需要 拼接 ()  类似这样(111,222,333,444,555,666)
+     * 但是考虑到需要把 空字符串的数据也查询出来的时候 类似这样 (111,222,333,444,555,666,'','')
+     * 就需在传递参数之前将 ''空串的值替换为："null" 然后用以下下方法来做特殊处理操作
+     * wstv
+     * @param value
+     * @return
+     */
+    private String buildConditionByInValue(Object value){
+        StringBuilder builder =new StringBuilder();
+        builder.append("(");
+        String[] split = String.valueOf(value).split(",");
+        for(String v:split){
+            //此处将 "null" 转换为 '' 空串
+            if(ValidateUtil.isNull(v)) v="";
+            builder.append("'"+v+"'").append(",");
+        }
+        String b  = builder.toString();
+        b  = b.substring(0,b.length()-1);
+        b+=")";
+        value = b;
+        return b;
+    }
 
     public Object getValue() {
         return value;

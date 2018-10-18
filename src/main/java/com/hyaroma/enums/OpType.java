@@ -5,7 +5,8 @@ public enum OpType {
     //1：group 单个值作为多个字段的查询条件标识
     //2：and | or  作为组合条件单字段多个值的中间判断条件
     // 3: and | or 作为整合查询后续判断条件
-    AND("and", "并且"), OR("or", "或者"),
+    AND("and", "并且"),
+    OR("or", "或者"),
     GROUP_AND_AND("group_and_and","例如个都是and：where (EmpCode='111' AND EmpID='111')  AND  EmpName ='李巍'"),
     GROUP_OR_OR("group_or_or","例如两个都是or：where (EmpCode='111' OR EmpID='111')  OR  EmpName ='李巍'"),
     GROUP_AND_OR("group_and_or","例如组合为and 后续为or：where (EmpCode='111' AND EmpID='111')  OR  EmpName ='李巍'"),

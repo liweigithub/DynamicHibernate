@@ -24,16 +24,8 @@ public class DynamicStatementBuilderImpl implements IDynamicStatementBuilder, Re
 	}
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(DynamicStatementBuilderImpl.class);
-
-	/**
-	 * 模板hql内容
-	 */
-	private Map<String, String> namedHQLQueries;
-
-	/**
-	 * 模板sql 内容
-	 */
-	private Map<String, String> namedSQLQueries;
+	private Map<String, String> namedHQLQueries;//模板hql内容
+	private Map<String, String> namedSQLQueries;//模板sql 内容
 	private String[] fileNames;
 	private ResourceLoader resourceLoader;
 	/**
@@ -45,14 +37,17 @@ public class DynamicStatementBuilderImpl implements IDynamicStatementBuilder, Re
 		this.fileNames = fileNames;
 	}
 
+	@Override
 	public Map<String, String> getNamedHQLQueries() {
 		return namedHQLQueries;
 	}
 
+	@Override
 	public Map<String, String> getNamedSQLQueries() {
 		return namedSQLQueries;
 	}
 
+	@Override
 	public void init() throws IOException {
 		namedHQLQueries = new HashMap<String, String>();
 		namedSQLQueries = new HashMap<String, String>();
@@ -70,6 +65,7 @@ public class DynamicStatementBuilderImpl implements IDynamicStatementBuilder, Re
 		nameCache.clear();
 	}
 
+	@Override
 	public void setResourceLoader(ResourceLoader resourceLoader) {
 		this.resourceLoader = resourceLoader;
 	}
@@ -91,6 +87,7 @@ public class DynamicStatementBuilderImpl implements IDynamicStatementBuilder, Re
 	private void buildMap(Resource resource) {
 		InputSource inputSource = null;
 		try {
+			LOGGER.info("开始加载："+resource.getFile().getPath()+"");
 			inputSource = new InputSource(resource.getInputStream());
 			SAXReader reader = new SAXReader();
 			Document doc = reader.read(inputSource);
@@ -126,7 +123,7 @@ public class DynamicStatementBuilderImpl implements IDynamicStatementBuilder, Re
 			throws Exception {
 		String sqlQueryName = element.attribute("name").getText();
 		if (nameCache.contains(sqlQueryName)) {
-			throw new Exception("sql-query | hql-query名称重复，文件:" + resource.getURI() + "，sql-query | hql-query 不能重复存在.");
+			throw new Exception("sql-query | hql-query名称重复，文件:" + resource.getURI() +":"+sqlQueryName+ "，sql-query | hql-query 不能重复存在.");
 		}
 		nameCache.add(sqlQueryName);
 		String queryText = element.getText();//模板内容信息

@@ -5,27 +5,32 @@
 <dynamic-statement>
 	<sql-query name="emp.findByName">
 		<![CDATA[
-			select id,name from employee where 1=1 group by  id order by id
+			select
+				id as id,
+				name as name
+			from
+				oa.employee
+			where 1=1
+			<#if name != "">
+				and name like '${name}%'
+			</#if>
+			group by
+				id
 		 ]]>
 	</sql-query>
 
 	 <sql-query name="emp.deleteEmp">
 		 <![CDATA[
-			delete from employee where 1=1
+			delete from oa.employee where id=${id}
 		 ]]>
 	</sql-query>
 
     <hql-query name="emp.findById">
         <![CDATA[
-        	select id,name from com.hyaroma.domain.Employee where 1=1
+        	 from com.hyaroma.domain.Employee where 1=1
 			<#if id !="" && id!="0">
 				and id=${id}
 			</#if>
-        ]]>
-    </hql-query>
-    <hql-query name="emp.findEmp1">
-        <![CDATA[
-        	select * from oa.employee
         ]]>
     </hql-query>
 </dynamic-statement>

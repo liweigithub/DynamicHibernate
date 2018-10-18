@@ -1,21 +1,28 @@
 package com.hyaroma.dao.base.impl;
 
 
-import freemarker.cache.StringTemplateLoader;
-import freemarker.template.Configuration;
-import freemarker.template.Template;
 import com.hyaroma.dao.base.Condition;
+import com.hyaroma.dao.base.CustomerHashMap;
 import com.hyaroma.dao.base.IBaseDao;
 import com.hyaroma.dao.base.PageBean;
 import com.hyaroma.dao.hibernate.DynamicStatementBuilderImpl;
 import com.hyaroma.dao.hibernate.IDynamicStatementBuilder;
 import com.hyaroma.dao.hibernate.StatementTemplate;
+import com.hyaroma.dao.utils.CountSqlParser;
+import com.hyaroma.dao.utils.FormatUtil;
+import com.hyaroma.dao.utils.ValidateUtil;
 import com.hyaroma.enums.OrderType;
+import com.hyaroma.exception.WDaoException;
+import freemarker.cache.StringTemplateLoader;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
 import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.query.NativeQuery;
 import org.hibernate.query.Query;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.orm.hibernate5.support.HibernateDaoSupport;
 import org.springframework.stereotype.Repository;
@@ -39,11 +46,10 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
     private static final String REG = "(?:')|(?:--)|(/\\*(?:.|[\\n\\r])*?\\*/)|"
             + "(\\b(select|update|and|or|delete|insert|trancate|char|into|substr|ascii|declare|exec|count|master|into|drop|execute)\\b)";
     private static   Pattern sqlPattern = Pattern.compile(REG, Pattern.CASE_INSENSITIVE);
+    private static final Logger logger = LoggerFactory.getLogger(BaseDaoImpl.class);
     protected Map<String, StatementTemplate> templateCache;//缓存相应的模板信息
-
     @Resource(name="dynamicStatementBuilderImpl")
     protected IDynamicStatementBuilder dynamicStatementBuilder;
-
     @Resource(name = "sessionFactory")
     public void setSuperSessionFactory(SessionFactory sessionFactory) {
         super.setSessionFactory(sessionFactory);
@@ -159,7 +165,7 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
     }
 
     @Override
-    public <D> D findById(Class<D> clazz, long id) {
+    public <D> D findById(Class<D> clazz, String id) {
         try {
             D instance = (D) getSession().get(clazz, id);
             return instance;
@@ -169,6 +175,16 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
         }
     }
 
+    @Override
+    public <D> D findById(Class<D> clazz, int id) {
+        try {
+            D instance = (D) getSession().get(clazz, id);
+            return instance;
+        } catch (HibernateException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 
     @Override
     public <D> Object  save(D transientInstance) {
@@ -196,14 +212,21 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
         String hql = "from "+clazz.getName()+" where 1=1 ";
         //from Dommain where xx=1 and xxx=2
         StringBuilder builder =new StringBuilder(hql);
+        String soAuthorizeHQL = "";
         if (conditions!=null && !conditions.isEmpty()){
             int i = 0;
             for(Condition condition:conditions){
-
+                if (condition.getColumn().equals("soAuthorizeHQL")){
+                    soAuthorizeHQL = condition.getValue().toString();
+                    continue;
+                }
                 if(isValid(condition.getValue().toString())){//校验是否sql 注入
                     builder.append(condition.buildHql());//不带 order by 的hql 语句
                 }
                 i++;
+            }
+            if (!ValidateUtil.isNull(soAuthorizeHQL)){
+                builder.append(" and "+ soAuthorizeHQL.replaceAll("@",""));
             }
         }
         //查询总记录数
@@ -227,6 +250,9 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
         query.setFirstResult((pageIndex-1)*pageSize);
         query.setMaxResults(pageSize);
         List list = query.list();
+        if (list==null || list.isEmpty()){
+            list = Collections.emptyList();
+        }
         PageBean<D> bean = new PageBean<D>(pageIndex,pageSize,count);
         bean.setData(list);
         return bean;
@@ -329,6 +355,7 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
     @Override
     public PageBean<Map<String, Object>> queryByDynamicName(final String queryName,int pageIndex,int pageSize,final String[] fields,final Map<String, ?> parameters) {
         if( queryName==null || parameters==null || parameters.size()==0 ||fields==null||fields.length == 0) {
+            logger.error("queryByDynamicName method param （queryName | parameters | fields）not be null");
             return null;
         }
         StatementTemplate statementTemplate = templateCache.get(queryName);
@@ -338,14 +365,17 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
         if(statementTemplate.getType() == StatementTemplate.TYPE.HQL){
             list = this.parseObjectToMap(createHQLQueryPage(statement, pageIndex, pageSize).list(), fields);
             if (pageSize != Integer.MAX_VALUE){
-                dataCount = this.queryIntByHQL(convertToCountQl(statement));
+                dataCount = this.queryIntByHQL(convertToCountQl(statement,statementTemplate.getType()));
             }
         }
         else{
           list = this.parseObjectToMap(createSQLQueryPage(statement, pageIndex, pageSize).list(),fields);
             if (pageSize != Integer.MAX_VALUE && pageSize != 0){
-                dataCount  = this.queryIntBySQL(convertToCountQl(statement));
+                dataCount  = this.queryIntBySQL(convertToCountQl(statement,statementTemplate.getType()));
             }
+        }
+        if(list == null){
+            list = Collections.emptyList();
         }
         PageBean<Map<String, Object>> pageBean = new PageBean<Map<String, Object>>(pageIndex,pageSize,dataCount);
         pageBean.setData(list);
@@ -361,27 +391,69 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
      * @return 特定的entitylist 集合
      */
     @Override
-    public PageBean<Object> queryByDynamicName(final String queryName,int pageIndex,int pageSize,Class clazz, final String[] fields,final Map<String, ?> parameters) {
-        if( queryName==null || clazz==null || fields==null || fields.length ==0  || parameters==null || parameters.size()==0 ) {
+    public <D>  PageBean<D> queryByDynamicName(final String queryName,int pageIndex,int pageSize,Class<D> clazz, final String[] fields,final Map<String, ?> parameters) {
+        if( queryName==null || clazz==null || parameters==null || parameters.size()==0 ) {
             return null;
         };
         StatementTemplate statementTemplate = templateCache.get(queryName);
         String statement = processTemplate(statementTemplate,parameters);
         int dataCount = 0;
-        List list = new ArrayList();
+        List<D> list = new ArrayList<D>();
         if(statementTemplate.getType() == StatementTemplate.TYPE.HQL){
             if (pageSize != Integer.MAX_VALUE){
-                dataCount = this.queryIntByHQL(convertToCountQl(statement));
+                dataCount = this.queryIntByHQL(convertToCountQl(statement,statementTemplate.getType()));
             }
-            list =  this.parseObjectToList(createHQLQueryPage(statement, pageIndex, pageSize).list(), clazz, fields);
+            if (fields ==null || fields.length <=0){
+                //hql 的时候 可能需要返回整个实体类 所以可以不需要指定返回字段
+                list  = createHQLQueryPage(statement, pageIndex, pageSize).list();
+            }else{
+                //指定字段
+                list =  this.parseObjectToList(createHQLQueryPage(statement, pageIndex, pageSize).list(), clazz, fields);
+            }
         }
         else{
             if (pageSize != Integer.MAX_VALUE){
-                dataCount = this.queryIntBySQL(convertToCountQl(statement));
+                dataCount = this.queryIntBySQL(convertToCountQl(statement,statementTemplate.getType()));
             }
             list = this.parseObjectToList(createSQLQueryPage(statement, pageIndex, pageSize).list(), clazz, fields);
         }
-        PageBean<Object> pageBean = new PageBean<Object>(pageIndex,pageSize,dataCount);
+        if(list == null){
+            list = Collections.emptyList();
+        }
+        PageBean<D> pageBean = new PageBean<D>(pageIndex,pageSize,dataCount);
+        pageBean.setData(list);
+        return pageBean;
+    }
+
+
+    /**
+     * 命名查询(针对特殊HQL语句，例如：from User left join Department as dept on user.deptId =dept.Id ) 此时返回的结果集对象应该是 List<Object[]>
+     * @param queryName hql查询名称
+     * @param parameters 查询参数
+     * @return 特定的 List<Object[]> 集合
+     */
+    @Override
+    public PageBean<Object[]> queryByDynamicName(final String queryName,int pageIndex,int pageSize,final Map<String, ?> parameters) {
+        if( queryName==null ||  parameters==null  ) {
+           throw  new WDaoException(" queryByDynamicName method param (queryName/parameters) is requird");
+        };
+        StatementTemplate statementTemplate = templateCache.get(queryName);
+        String statement = processTemplate(statementTemplate,parameters);
+        int dataCount = 0;
+        List<Object[]> list = new ArrayList<Object[]>();
+        if(statementTemplate.getType() == StatementTemplate.TYPE.HQL){
+            if (pageSize != Integer.MAX_VALUE){
+                dataCount = this.queryIntByHQL(convertToCountQl(statement,statementTemplate.getType()));
+            }
+            list  = createHQLQueryPage(statement, pageIndex, pageSize).list();
+        }
+        else{
+            throw  new WDaoException("This Method QueryByDynamicName StatementTemplate.TYPE  Required  HQL");
+        }
+        if(list == null){
+            list = Collections.emptyList();
+        }
+        PageBean<Object[]> pageBean = new PageBean<Object[]>(pageIndex,pageSize,dataCount);
         pageBean.setData(list);
         return pageBean;
     }
@@ -393,27 +465,41 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
      * @param ql
      * @return
      */
-    private String convertToCountQl(String ql){
-        String  []replaceStr=new String[]{"from","order","group"};
+    private String convertToCountQl(String ql,StatementTemplate.TYPE type){
+        //先将from 替换成大写
+        //before  select * from aaa where order=1 and fromType=11 group by 222  order by 111
+       //after:select * FROM aaa where order=1 and fromType=11 group by 222  order by 111
+        ql = FormatUtil.completeReplace(ql,"from","FROM");
+        String  []replaceStr=new String[]{"order by","group by"};
         String countQl ="";
         for(String str:replaceStr){
-            countQl = new String(ql.replaceAll(str,str.toUpperCase()));
+            countQl = ql.replaceAll(str,str.toUpperCase());
             ql = countQl;
         }
         countQl = countQl.substring(countQl.indexOf("FROM"));
         if (countQl.contains("GROUP")){
             //before：　from xxx where 1=1 GROUP BY  xxx ORDER BY xxx  　after :from xxx where 1=1
-            countQl = countQl.substring(0, countQl.lastIndexOf("GROUP"));
+            countQl = countQl.substring(0, countQl.lastIndexOf("GROUP BY"));
         }
         if (countQl.contains("ORDER")){
             //before：　from xxx where 1=1 ORDER BY  XX　after :from xxx where 1=1
-            countQl = countQl.substring(0, countQl.lastIndexOf("ORDER"));
+            countQl = countQl.substring(0, countQl.lastIndexOf("ORDER BY"));
         }
-        return "select COUNT(*) "+countQl;
+        if (type == StatementTemplate.TYPE.HQL){
+            return "select COUNT(*) "+countQl;
+        }else{
+            return  CountSqlParser.getSmartCountSql(ql);
+        }
     }
-    /*
-    * 参数sql注入校验
-    */
+
+
+
+
+    /**
+     * 参数sql注入校验
+     * @param str （sql） 语句
+     * @return
+     */
     private static boolean isValid(String str) {
         if (sqlPattern.matcher(str).find()) {
             return false;
@@ -423,6 +509,9 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
 
     /**
      * 将查询到的对象数组转换为 list map 集合
+     * @param dataList
+     * @param fields
+     * @return
      */
     private List parseObjectToMap(List dataList, String[] fields) {
         if (dataList == null || dataList.size() == 0 || fields == null || fields.length == 0)
@@ -433,7 +522,7 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
             List list = new ArrayList();
             if (dataList != null && dataList.size() > 0) {
                 for (int i = 0; i < dataList.size(); i++) {
-                    Map map = new HashMap();
+                    Map map = new CustomerHashMap();
                     if(! dataList.get(i).getClass().isArray() ){
                         for (int j = 0; j < fields.length; j++) {
                             map.put(fields[j], dataList.get(i));
@@ -464,9 +553,15 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
 
     /**
      * 将查询到的对象数组转换为,转换为List<clazz>集合
-     * */
+     * @param dataList
+     * @param clazz
+     * @param fields
+     * @return
+     */
     private List parseObjectToList(List dataList, Class clazz, String[] fields) {
-        if(dataList==null||dataList.size()==0||clazz==null||fields==null||fields.length==0)    return Collections.emptyList();;
+        if(dataList==null||dataList.size()==0||clazz==null||fields==null||fields.length==0){
+            return Collections.emptyList();
+        }
         try {
             List list = new ArrayList();
             if (dataList != null && dataList.size() > 0) {
@@ -606,13 +701,12 @@ public class BaseDaoImpl extends HibernateDaoSupport implements IBaseDao {
         StatementTemplate statementTemplate = templateCache.get(queryName);
         String statement = processTemplate(statementTemplate,parameters);
         if(statementTemplate.getType() == StatementTemplate.TYPE.HQL){
-            Query query = this.getSession().createQuery(statement);
-           return  query.executeUpdate();
-        }
-        else{
-            Query query = this.getSession().createNativeQuery(statement);
+            Query query =getSession().createQuery(statement);
             return  query.executeUpdate();
         }
+        else{
+            Query query =getSession().createNativeQuery(statement);
+            return  query.executeUpdate();}
     }
 
     @Override

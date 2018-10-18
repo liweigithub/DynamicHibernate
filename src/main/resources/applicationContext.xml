@@ -18,7 +18,6 @@
 	</bean>
 	<import resource="applicationContext-dao.xml" />
 	<import resource="applicationContext-trans.xml" />
-	<bean id="springContextUtils" class="com.hyaroma.dao.spring.SpringContextUtils" />
 
 	<!--  开启扫描sping 组件 -->
 	<context:component-scan base-package="com.hyaroma.dao.*" />

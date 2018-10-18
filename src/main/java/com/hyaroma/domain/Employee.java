@@ -13,20 +13,20 @@ import java.util.Date;
 @Table(name = "employee", catalog = "oa")
 public class Employee {
 
-    private long id;
+    private String id;
     private String name;
-    private double baLance;
+    private double balance;
     private short status;
     private Date birthday;
     private int sex;
 
     @Id
     @Column(name = "id", unique = true, nullable = false)
-    public long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -38,14 +38,12 @@ public class Employee {
         this.name = name;
     }
 
-    public double getBaLance() {
-        return baLance;
+    public double getBalance() {
+        return balance;
     }
-
-    public void setBaLance(double baLance) {
-        this.baLance = baLance;
+    public void setBalance(double balance) {
+        this.balance = balance;
     }
-
     public short getStatus() {
         return status;
     }
