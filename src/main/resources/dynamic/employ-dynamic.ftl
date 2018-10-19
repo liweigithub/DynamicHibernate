@@ -11,7 +11,7 @@
 			from
 				oa.employee
 			where 1=1
-			<#if name != "">
+			<#if name != ''>
 				and name like '${name}%'
 			</#if>
 			group by
@@ -28,7 +28,7 @@
     <hql-query name="emp.findById">
         <![CDATA[
         	 from com.hyaroma.domain.Employee where 1=1
-			<#if id !="" && id!="0">
+			<#if id != '' && id != 0>
 				and id=${id}
 			</#if>
         ]]>
